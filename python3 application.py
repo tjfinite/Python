@@ -8,5 +8,5 @@ while True:
         break
     except ValueError:
         print("Vek musi byt cele cislo!")
-
+#Komentar
 print(meno, priezvisko, "ma", vek, "rokov.")
