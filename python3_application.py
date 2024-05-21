@@ -1,50 +1,58 @@
-def vstupne_parametre():
-    dochodkovy_vek = 86
-    meno = input('Meno:')
-    priezvisko = input("Priezvisko:")
-    while True:  # Kontrola datoveho typu parametru vek
-        vek = input("Vek:")
+from datetime import datetime  # Import the datetime module
+
+def getInput():
+    retirementAge = 86  # Define retirement age
+    name = input('Name: ')  # Get user's name
+    surname = input("Surname: ")  # Get user's surname
+    
+    # Loop until valid birth date is provided
+    while True:
+        birthDateInput = input("Birth date (DD-MM-YYYY): ")  # Get user's birth date
         try:
-            vek = int(vek)
-            if vek >= 0:
-                break
+            birthDate = datetime.strptime(birthDateInput, "%d-%m-%Y")  # Parse birth date string to datetime object
+            currentDate = datetime.now()  # Get current date and time
+            age = currentDate.year - birthDate.year - ((currentDate.month, currentDate.day) < (birthDate.month, birthDate.day))  # Calculate age
+            if age >= 0:
+                break  # Break the loop if age is valid
             else:
-                print("Vek musi byt kladne cislo!")
+                print("Invalid birth date! Please enter a valid date.")
         except ValueError:
-            print("Vek musi byt cele cislo!")
-    while True:  # Kontrola datoveho typu parametru pocet_rokov
-        pocet_rokov = input('Pocet rokov:')
+            print("Invalid date format! Please enter date in DD-MM-YYYY format.")
+    
+    # Loop until valid number of years to add is provided
+    while True:
+        addYears = input('Add years: ')  # Get number of years to add
         try:
-            pocet_rokov = int(pocet_rokov)
-            if pocet_rokov >= 0:
-                break
+            addYears = int(addYears)
+            if addYears >= 0:
+                break  # Break the loop if years to add is valid
             else:
-                print("Pocet rokov musi byt kladne cislo!")
+                print("Years to add have to be a positive number!")
         except ValueError:
-            print("Pocet rokov musi byt cele cislo!")
-    return meno, priezvisko, vek, dochodkovy_vek, pocet_rokov
+            print("Years to add have to be an integer!")
+    
+    return name, surname, age, retirementAge, addYears  # Return user input as tuple
 
-def vystupne_parametre(meno, priezvisko, vek, dochodkovy_vek, pocet_rokov):
-    sucet_rokov = vek + pocet_rokov
-    if sucet_rokov > 85:  # Kontrola dochodkoveho veku
-        return "v dochodkovom veku."
-    elif sucet_rokov < 19:  # Kontrola veku do 18
-        return "mat menej ako 18 rokov."
+# Function to determine status based on age and retirement age
+def setAnswer(retirementAge, addYears):
+    totalYears = age + addYears
+    if totalYears > retirementAge:
+        return "in retirement age"
+    elif totalYears < 19:
+        return "underaged"
     else:
-        return "v produktivnom veku."
+        return "in productive age"
 
-meno, priezvisko, vek, dochodkovy_vek, pocet_rokov = vstupne_parametre()
-vystup = vystupne_parametre(meno, priezvisko, vek, dochodkovy_vek, pocet_rokov)
+# Function to determine word style (singular or plural) based on number of years
+def setWordStyle(years):
+    return "year" if years == 1 else "years"
 
-def stylistika(cislo):
-    if cislo == 1:
-        return "rok"
-    elif 1 < cislo < 5:
-        return "roky"
-    else:
-        return "rokov"
+# Main program
+name, surname, age, retirementAge, addYears = getInput()  # Get user input
+status = setAnswer(retirementAge, addYears)  # Determine status
+word1 = setWordStyle(age)  # Determine word style for current age
+word2 = setWordStyle(addYears)  # Determine word style for years to add
+word3 = setWordStyle(age + addYears)  # Determine word style for total age after adding years
 
-slovo1 = stylistika(vek)
-slovo2 = stylistika(pocet_rokov)
-
-print(f"{meno} {priezvisko} ma {vek} {slovo1} a o {pocet_rokov} {slovo2} rokov bude {vystup}")
+# Print formatted output
+print(f"{name} {surname} is {age} {word1} old. {name} will be {status} at {age + addYears} {word3} old after adding {addYears} {word2}.")
