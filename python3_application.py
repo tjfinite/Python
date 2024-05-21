@@ -9,8 +9,8 @@ class retirementCalculator:
         self.addYears = 0
     
     def getInput(self):
-        self.name = input('Name: ')  # Get user's name
-        self.surname = input("Surname: ")  # Get user's surname
+        self.name = input('Name: ').strip().capitalize()  # Get user's name and capitalize the first letter
+        self.surname = input("Surname: ").strip().capitalize()  # Get user's surname and capitalize the first letter
         
         # Loop until valid birth date is provided
         while True:
