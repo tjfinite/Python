@@ -1,4 +1,5 @@
 import sqlite3
+import csv
 from datetime import datetime
 from contextlib import closing
 
@@ -34,6 +35,23 @@ class DataStorage:
                 VALUES (?, ?, ?, ?)
             ''', (name, surname, birth_date, add_years))
 
+    def edit_user(self, user_id, name, surname, birth_date, add_years):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute('''
+                UPDATE users
+                SET name=?, surname=?, birth_date=?, add_years=?
+                WHERE id=?
+            ''', (name, surname, birth_date, add_years, user_id))
+        self.conn.commit()
+
+    def remove_user(self, user_id):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute('''
+                DELETE FROM users
+                WHERE id=?
+            ''', (user_id,))
+        self.conn.commit()
+
     def get_all_users(self):
         with self.conn:
             cursor = self.conn.cursor()
@@ -48,6 +66,17 @@ class DataStorage:
 
     def close_connection(self):
         self.conn.close()
+    
+    def export_to_csv(self, filename='users_data.csv'):
+        with self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute('SELECT * FROM users')
+            users = cursor.fetchall()
+
+            with open(filename, 'w', newline='') as csvfile:
+                csvwriter = csv.writer(csvfile)
+                csvwriter.writerow(['id', 'name', 'surname', 'birth_date', 'add_years'])
+                csvwriter.writerows(users)
 
 class RetirementCalculator:
     RETIREMENT_AGE = 86
@@ -84,44 +113,63 @@ class RetirementCalculator:
         
         return name, surname, birth_date.strftime("%d-%m-%Y"), add_years
 
-    def run(self):
-        storage_type = input("Where do you want to save the data? (file/memory): ").lower()
-        if storage_type not in ["file", "memory"]:
-            print("Invalid choice! Please enter 'file' or 'memory'.")
-            return
-
-        self.data_storage = DataStorage(storage_type)
-
-        name, surname, birth_date, add_years = self.get_input()
-        total_years = datetime.now().year - datetime.strptime(birth_date, "%d-%m-%Y").year + add_years
-        status = "in retirement age" if total_years > self.RETIREMENT_AGE else ("underaged" if total_years < 19 else "in productive age")
-
-        print(f"{name} {surname} is {total_years} {'year' if total_years == 1 else 'years'} old. {name} will be {status} after adding {add_years} {'year' if add_years == 1 else 'years'}.")
-
-        self.data_storage.insert_user(name, surname, birth_date, add_years)
-
+    def print_database(self):
         print("Data from chosen storage:")
         users = self.data_storage.get_all_users()
         for user in users:
             print(user)
 
-        self.data_storage.close_connection()
+    def run(self):
+        while True:
+            storage_type = input("Where do you want to save the data? (file/memory): ").lower()
+            if storage_type not in ["file", "memory"]:
+                print("Invalid choice! Please enter 'file' or 'memory'.")
+                continue
+            
+            self.data_storage = DataStorage(storage_type)
+            self.print_database()
+
+            while True:
+                action = input("What do you want to do? (add/edit/delete/export/finish): ").lower()
+                if action == "add":
+                    name, surname, birth_date, add_years = self.get_input()
+                    self.data_storage.insert_user(name, surname, birth_date, add_years)
+                    self.print_database()
+                elif action == "edit":
+                    user_id = int(input("Enter the ID of the user you want to edit: "))
+                    name, surname, birth_date, add_years = self.get_input()
+                    self.data_storage.edit_user(user_id, name, surname, birth_date, add_years)
+                    self.print_database()
+                elif action == "delete":
+                    user_id = int(input("Enter the ID of the user you want to remove: "))
+                    self.data_storage.remove_user(user_id)
+                    self.print_database()
+                elif action == "export":
+                    filename = input("Enter the filename for the CSV export (default 'users_data.csv'): ").strip()
+                    if not filename:
+                        filename = 'users_data.csv'
+                    self.data_storage.export_to_csv(filename)
+                    print(f"Data exported to {filename}")
+                elif action == "finish":
+                    break
+                else:
+                    print("Invalid action! Please enter 'add', 'edit', 'delete', 'export', or 'finish'.")
+
+            break  # Exit loop after finishing
 
 if __name__ == "__main__":
     calculator = RetirementCalculator()
     while True:
         calculator.run()
-        choice = input("Do you want to add another line to the database? (yes/no): ").lower()
-        if choice != "yes":
-            print_last_record = input("Do you want to print the last record? (yes/no): ").lower()
-            if print_last_record == "yes":
-                if calculator.data_storage:
-                    last_user = calculator.data_storage.get_last_user()
-                    if last_user:
-                        print("Last record:")
-                        print(last_user)
-                    else:
-                        print("No records in the database.")
+        print_last_record = input("Do you want to print the last record? (yes/no): ").lower()
+        if print_last_record == "yes":
+            if calculator.data_storage:
+                last_user = calculator.data_storage.get_last_user()
+                if last_user:
+                    print("Last record:")
+                    print(last_user)
                 else:
-                    print("No data storage object available.")
-            break
+                    print("No records in the database.")
+            else:
+                print("No data storage object available.")
+        break
