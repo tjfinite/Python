@@ -1,5 +1,6 @@
 import sqlite3
-from datetime import datetime  # Import the datetime module
+from datetime import datetime
+from contextlib import closing
 
 class DataStorage:
     def __init__(self, storage_type):
@@ -7,7 +8,8 @@ class DataStorage:
         if self.storage_type == "memory":
             self.conn = sqlite3.connect(':memory:')  # Temporary in-memory database
         elif self.storage_type == "file":
-            self.conn = sqlite3.connect('retirement_data.db')  # Permanent file-based database
+            self.db_file = 'retirement_data.db'
+            self.conn = sqlite3.connect(self.db_file)  # Permanent file-based database
         else:
             raise ValueError("Invalid storage type. Choose 'memory' or 'file'.")
         
@@ -33,66 +35,55 @@ class DataStorage:
             ''', (name, surname, birth_date, add_years))
 
     def get_all_users(self):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM users')
-        return cursor.fetchall()
+        with self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute('SELECT * FROM users')
+            return cursor.fetchall()
+
+    def get_last_user(self):
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM users ORDER BY id DESC LIMIT 1')
+            return cursor.fetchone()
 
     def close_connection(self):
         self.conn.close()
 
-class retirementCalculator:
+class RetirementCalculator:
+    RETIREMENT_AGE = 86
+
     def __init__(self):
-        self.retirementAge = 86  # Define retirement age
-        self.name = ""
-        self.surname = ""
-        self.age = 0
-        self.addYears = 0
-        self.birthDate = ""
         self.data_storage = None
 
-    def getInput(self):
-
-        self.name = input('Name: ').strip().capitalize()
-        self.surname = input("Surname: ").strip().capitalize()
+    def get_input(self):
+        name = input('Name: ').strip().capitalize()
+        surname = input("Surname: ").strip().capitalize()
         
-        # Loop until valid birth date is provided
         while True:
-            birthDateInput = input("Birth date (DD-MM-YYYY): ")  # Get user's birth date
+            birth_date_input = input("Birth date (DD-MM-YYYY): ")
             try:
-                self.birth_date = datetime.strptime(birthDateInput, "%d-%m-%Y")
-                currentDate = datetime.now()  # Get current date and time
-                self.age = currentDate.year - self.birth_date.year - ((currentDate.month, currentDate.day) < (self.birth_date.month, self.birth_date.day))
-                if self.age >= 0:
-                    break  # Break the loop if age is valid
+                birth_date = datetime.strptime(birth_date_input, "%d-%m-%Y")
+                age = datetime.now().year - birth_date.year
+                if age >= 0:
+                    break
                 else:
                     print("Invalid birth date! Please enter a valid date.")
             except ValueError:
                 print("Invalid date format! Please enter date in DD-MM-YYYY format.")
         
-        # Loop until valid number of years to add is provided
         while True:
-            addYearsInput = input('Add years: ')  # Get number of years to add
+            add_years_input = input('Add years: ')
             try:
-                self.addYears = int(addYearsInput)
-                if self.addYears >= 0:
-                    break  # Break the loop if years to add is valid
+                add_years = int(add_years_input)
+                if add_years >= 0:
+                    break
                 else:
                     print("Years to add have to be a positive number!")
             except ValueError:
                 print("Years to add have to be an integer!")
-    
-    def setAnswer(self):
-        totalYears = self.age + self.addYears
-        if totalYears > self.retirementAge:
-            return "in retirement age"
-        elif totalYears < 19:
-            return "underaged"
-        else:
-            return "in productive age"
-    
-    def setWordStyle(self, years):
-        return "year" if years == 1 else "years"
-    
+        
+        return name, surname, birth_date.strftime("%d-%m-%Y"), add_years
+
     def run(self):
         storage_type = input("Where do you want to save the data? (file/memory): ").lower()
         if storage_type not in ["file", "memory"]:
@@ -101,16 +92,13 @@ class retirementCalculator:
 
         self.data_storage = DataStorage(storage_type)
 
-        self.getInput()  # Get user input
-        status = self.setAnswer()  # Determine status
-        word1 = self.setWordStyle(self.age)  # Determine word style for current age
-        word2 = self.setWordStyle(self.addYears)  # Determine word style for years to add
-        word3 = self.setWordStyle(self.age + self.addYears)  # Determine word style for total age after adding years
+        name, surname, birth_date, add_years = self.get_input()
+        total_years = datetime.now().year - datetime.strptime(birth_date, "%d-%m-%Y").year + add_years
+        status = "in retirement age" if total_years > self.RETIREMENT_AGE else ("underaged" if total_years < 19 else "in productive age")
 
-        # Print formatted output
-        print(f"{self.name} {self.surname} is {self.age} {word1} old. {self.name} will be {status} at {self.age + self.addYears} {word3} old after adding {self.addYears} {word2}.")
+        print(f"{name} {surname} is {total_years} {'year' if total_years == 1 else 'years'} old. {name} will be {status} after adding {add_years} {'year' if add_years == 1 else 'years'}.")
 
-        self.data_storage.insert_user(self.name, self.surname, self.birth_date.strftime("%d-%m-%Y"), self.addYears)
+        self.data_storage.insert_user(name, surname, birth_date, add_years)
 
         print("Data from chosen storage:")
         users = self.data_storage.get_all_users()
@@ -119,11 +107,21 @@ class retirementCalculator:
 
         self.data_storage.close_connection()
 
-# This block ensures that the main function is called only when the script is run directly
 if __name__ == "__main__":
-    calculator = retirementCalculator()
+    calculator = RetirementCalculator()
     while True:
         calculator.run()
         choice = input("Do you want to add another line to the database? (yes/no): ").lower()
         if choice != "yes":
+            print_last_record = input("Do you want to print the last record? (yes/no): ").lower()
+            if print_last_record == "yes":
+                if calculator.data_storage:
+                    last_user = calculator.data_storage.get_last_user()
+                    if last_user:
+                        print("Last record:")
+                        print(last_user)
+                    else:
+                        print("No records in the database.")
+                else:
+                    print("No data storage object available.")
             break
