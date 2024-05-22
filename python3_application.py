@@ -122,4 +122,8 @@ class retirementCalculator:
 # This block ensures that the main function is called only when the script is run directly
 if __name__ == "__main__":
     calculator = retirementCalculator()
-    calculator.run()
+    while True:
+        calculator.run()
+        choice = input("Do you want to add another line to the database? (yes/no): ").lower()
+        if choice != "yes":
+            break
