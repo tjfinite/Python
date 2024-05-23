@@ -59,8 +59,8 @@ class DataStorage:
             return cursor.fetchall()
 
     def get_last_user(self):
-        with sqlite3.connect(self.db_file) as conn:
-            cursor = conn.cursor()
+        with self.conn:
+            cursor = self.conn.cursor()
             cursor.execute('SELECT * FROM users ORDER BY id DESC LIMIT 1')
             return cursor.fetchone()
 
@@ -79,10 +79,12 @@ class DataStorage:
                 csvwriter.writerows(users)
 
 class RetirementCalculator:
-    RETIREMENT_AGE = 86
+    RETIREMENT_AGE = 65
+    PRODUCTIVE_AGE_START = 18
 
     def __init__(self):
         self.data_storage = None
+        self.storage_type = None
 
     def get_input(self):
         name = input('Name: ').strip().capitalize()
@@ -113,6 +115,31 @@ class RetirementCalculator:
         
         return name, surname, birth_date.strftime("%d-%m-%Y"), add_years
 
+    def set_answer(self, age):
+        if age < self.PRODUCTIVE_AGE_START:
+            return "underaged"
+        elif age < self.RETIREMENT_AGE:
+            return "in productive age"
+        else:
+            return "in retirement age"
+
+    def set_word_style(self, age):
+        if age == 1:
+            return "year"
+        else:
+            return "years"
+
+    def print_status(self, name, surname, age, add_years):
+        current_status = self.set_answer(age)
+        future_age = age + add_years
+        future_status = self.set_answer(future_age)
+
+        word1 = self.set_word_style(age)
+        word2 = self.set_word_style(add_years)
+        word3 = self.set_word_style(future_age)
+
+        print(f"{name} {surname} is {current_status} at {age} {word1} old. {name} will be {future_status} at {future_age} {word3} old after adding {add_years} {word2}.")
+
     def print_database(self):
         print("Data from chosen storage:")
         users = self.data_storage.get_all_users()
@@ -121,41 +148,53 @@ class RetirementCalculator:
 
     def run(self):
         while True:
-            storage_type = input("Where do you want to save the data? (file/memory): ").lower()
-            if storage_type not in ["file", "memory"]:
-                print("Invalid choice! Please enter 'file' or 'memory'.")
-                continue
+            action = input("What do you want to do? (add/edit/delete/export/finish): ").lower()
+            if action == "finish":
+                break
             
-            self.data_storage = DataStorage(storage_type)
-            self.print_database()
-
-            while True:
-                action = input("What do you want to do? (add/edit/delete/export/finish): ").lower()
-                if action == "add":
-                    name, surname, birth_date, add_years = self.get_input()
-                    self.data_storage.insert_user(name, surname, birth_date, add_years)
+            if action in ["add", "edit", "delete", "export"]:
+                while True:
+                    storage_type = input("Where do you want to save the data? (file/memory): ").lower()
+                    if storage_type not in ["file", "memory"]:
+                        print("Invalid choice! Please enter 'file' or 'memory'.")
+                        continue
+                    if self.storage_type != storage_type:
+                        self.storage_type = storage_type
+                        self.data_storage = DataStorage(storage_type)
                     self.print_database()
-                elif action == "edit":
-                    user_id = int(input("Enter the ID of the user you want to edit: "))
-                    name, surname, birth_date, add_years = self.get_input()
-                    self.data_storage.edit_user(user_id, name, surname, birth_date, add_years)
-                    self.print_database()
-                elif action == "delete":
-                    user_id = int(input("Enter the ID of the user you want to remove: "))
-                    self.data_storage.remove_user(user_id)
-                    self.print_database()
-                elif action == "export":
-                    filename = input("Enter the filename for the CSV export (default 'users_data.csv'): ").strip()
-                    if not filename:
-                        filename = 'users_data.csv'
-                    self.data_storage.export_to_csv(filename)
-                    print(f"Data exported to {filename}")
-                elif action == "finish":
                     break
-                else:
-                    print("Invalid action! Please enter 'add', 'edit', 'delete', 'export', or 'finish'.")
 
-            break  # Exit loop after finishing
+            if action == "add":
+                name, surname, birth_date, add_years = self.get_input()
+                self.data_storage.insert_user(name, surname, birth_date, add_years)
+
+                birth_date = datetime.strptime(birth_date, "%d-%m-%Y")
+                age = datetime.now().year - birth_date.year
+                self.print_status(name, surname, age, add_years)
+
+                self.print_database()
+            elif action == "edit":
+                user_id = int(input("Enter the ID of the user you want to edit: "))
+                name, surname, birth_date, add_years = self.get_input()
+                self.data_storage.edit_user(user_id, name, surname, birth_date, add_years)
+
+                birth_date = datetime.strptime(birth_date, "%d-%m-%Y")
+                age = datetime.now().year - birth_date.year
+                self.print_status(name, surname, age, add_years)
+
+                self.print_database()
+            elif action == "delete":
+                user_id = int(input("Enter the ID of the user you want to remove: "))
+                self.data_storage.remove_user(user_id)
+                self.print_database()
+            elif action == "export":
+                filename = input("Enter the filename for the CSV export (default 'users_data.csv'): ").strip()
+                if not filename:
+                    filename = 'users_data.csv'
+                self.data_storage.export_to_csv(filename)
+                print(f"Data exported to {filename}")
+            else:
+                print("Invalid action! Please enter 'add', 'edit', 'delete', 'export', or 'finish'.")
 
 if __name__ == "__main__":
     calculator = RetirementCalculator()
