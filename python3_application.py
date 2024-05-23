@@ -212,5 +212,4 @@ if __name__ == "__main__":
                     print("No records in the database.")
             else:
                 print("No data storage object available.")
-        print("PySimpleGUI version: "PySimpleGUI.__version__)
         break
